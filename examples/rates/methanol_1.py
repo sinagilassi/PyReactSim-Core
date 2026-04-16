@@ -1,0 +1,285 @@
+import math
+from typing import Dict
+
+import numpy as np
+from pythermodb_settings.models import CustomProperty
+from pyreactlab_core.models.reaction import Reaction
+
+from pyreactsim_core.models import rArgs, rParams, rRet, X, rXs, ReactionRateExpression
+
+from examples.source.gas_load_model_source import CO2, H2, CH3OH, H2O, CO, model_source
+
+# SECTION: smooth floor function
+
+
+def smooth_floor(x: float | np.ndarray, xmin: float, s: float) -> float | np.ndarray:
+    """
+    Smooth approximation of ``max(x, xmin)`` using a numerically stable softplus.
+
+    Parameters
+    ----------
+    x : float | np.ndarray
+        Value(s) to floor.
+    xmin : float
+        Minimum smooth floor value.
+    s : float
+        Smoothing width. Smaller values approach a hard floor.
+    """
+    if s <= 0.0:
+        raise ValueError("smooth_floor requires s > 0.")
+
+    z = (np.asarray(x, dtype=float) - xmin) / s
+    y = xmin + s * np.logaddexp(0.0, z)
+
+    if np.isscalar(x):
+        return float(y)
+    return y
+
+# ====================================================
+# SECTION: Components and shared states
+# ====================================================
+
+
+components = [CO2, H2, CO, CH3OH, H2O]
+
+# Paper uses fugacity (bar). Here we use partial pressure in bar as requested.
+states: rXs = {
+    "CO-g": X(component=CO, order=1, unit="bar"),
+    "CO2-g": X(component=CO2, order=1, unit="bar"),
+    "H2-g": X(component=H2, order=1, unit="bar"),
+    "CH3OH-g": X(component=CH3OH, order=1, unit="bar"),
+    "H2O-g": X(component=H2O, order=1, unit="bar"),
+}
+
+rate_args: rArgs = {
+    "T": CustomProperty(value=503.0, unit="K", symbol="T"),
+    "rho_B": CustomProperty(value=1770.0, unit="kgcat/m3", symbol="rho_B"),
+    "a": CustomProperty(value=1.0, unit="-", symbol="a"),
+}
+
+rate_params: rParams = {
+    "R": CustomProperty(value=8.314462618, unit="J/mol.K", symbol="R"),
+}
+
+rate_eps = 1e-8
+
+# ====================================================
+# SECTION: Reaction 1
+# CO + 2H2 <=> CH3OH
+# Eq. (4) in the paper
+# ====================================================
+
+reaction_1 = Reaction(
+    name="reaction 1",
+    reaction="CO(g) + 2H2(g) <=> CH3OH(g)",
+    components=components,
+)
+
+ret_1: rRet = CustomProperty(value=0.0, unit="mol/m3.s", symbol="r1")
+
+
+def r1(Xs: Dict[str, X], args: rArgs, params: rParams) -> CustomProperty:
+    eps = rate_eps
+
+    P_CO = Xs["CO-g"].value
+    P_CO2 = Xs["CO2-g"].value
+    P_H2 = float(smooth_floor(Xs["H2-g"].value, xmin=eps, s=0.1 * eps))
+    P_CH3OH = Xs["CH3OH-g"].value
+    P_H2O = Xs["H2O-g"].value
+
+    T = args["T"].value
+    rho_B = args["rho_B"].value
+    a = args["a"].value
+    R = params["R"].value
+
+    k1 = 4.65e7 * math.exp(-107752.86 / (R * T))
+    KCO = 2.16e-5 * math.exp(47120.51 / (R * T))
+    KCO2 = 7.92e-7 * math.exp(62148.78 / (R * T))
+    KH2O_over_sqrt_KH2 = 4.39e-9 * math.exp(84350.46 / (R * T))
+    KP1 = 10.0 ** (5139.0 / T - 12.621)
+
+    denominator = (
+        (1.0 + KCO * P_CO + KCO2 * P_CO2)
+        * (math.sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+    )
+    denominator = float(smooth_floor(denominator, xmin=eps, s=0.1 * eps))
+    KP1_safe = float(smooth_floor(KP1, xmin=eps, s=0.1 * eps))
+
+    # r1 = k1*KCO*(P_CO*P_H2^(3/2) - P_CH3OH/(P_H2^(1/2)*KP1))/den
+    r1_mass = k1 * KCO * (
+        P_CO * (P_H2 ** 1.5) - P_CH3OH / (math.sqrt(P_H2) * KP1_safe)
+    ) / denominator
+
+    r1_volume = a * rho_B * r1_mass
+
+    return CustomProperty(
+        name="r1",
+        description="CO hydrogenation rate (Graaf form, partial pressure in bar)",
+        value=r1_volume,
+        unit="mol/m3.s",
+        symbol="r1",
+    )
+
+
+rate_expression_1 = ReactionRateExpression(
+    name="reaction 1",
+    basis="pressure",
+    components=components,
+    reaction=reaction_1,
+    params=rate_params,
+    args=rate_args,
+    ret=ret_1,
+    state=states,
+    state_key="Formula-State",
+    eq=r1,
+    component_key="Name-Formula",
+)
+
+
+# ====================================================
+# SECTION: Reaction 2
+# CO2 + 3H2 <=> CH3OH + H2O
+# Eq. (5) in the paper
+# ====================================================
+
+reaction_2 = Reaction(
+    name="reaction 2",
+    reaction="CO2(g) + 3H2(g) <=> CH3OH(g) + H2O(g)",
+    components=components,
+)
+
+ret_2: rRet = CustomProperty(value=0.0, unit="mol/m3.s", symbol="r2")
+
+
+def r2(Xs: Dict[str, X], args: rArgs, params: rParams) -> CustomProperty:
+    eps = rate_eps
+
+    P_CO = Xs["CO-g"].value
+    P_CO2 = Xs["CO2-g"].value
+    P_H2 = float(smooth_floor(Xs["H2-g"].value, xmin=eps, s=0.1 * eps))
+    P_CH3OH = Xs["CH3OH-g"].value
+    P_H2O = Xs["H2O-g"].value
+
+    T = args["T"].value
+    rho_B = args["rho_B"].value
+    a = args["a"].value
+    R = params["R"].value
+
+    k2 = 9.64e11 * math.exp(-152900.0 / (R * T))
+    KCO = 2.16e-5 * math.exp(47120.51 / (R * T))
+    KCO2 = 7.92e-7 * math.exp(62148.78 / (R * T))
+    KH2O_over_sqrt_KH2 = 4.39e-9 * math.exp(84350.46 / (R * T))
+    KP2 = 10.0 ** (3066.0 / T - 10.592)
+
+    denominator = (
+        (1.0 + KCO * P_CO + KCO2 * P_CO2)
+        * (math.sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+    )
+    denominator = float(smooth_floor(denominator, xmin=eps, s=0.1 * eps))
+    KP2_safe = float(smooth_floor(KP2, xmin=eps, s=0.1 * eps))
+
+    # r2 = k2*KCO2*(P_CO2*P_H2^(3/2) - (P_H2O*P_CH3OH)/(P_H2^(3/2)*KP2))/den
+    r2_mass = k2 * KCO2 * (
+        P_CO2 * (P_H2 ** 1.5)
+        - (P_H2O * P_CH3OH) / ((P_H2 ** 1.5) * KP2_safe)
+    ) / denominator
+
+    r2_volume = a * rho_B * r2_mass
+
+    return CustomProperty(
+        name="r2",
+        description="CO2 hydrogenation rate (Graaf form, partial pressure in bar)",
+        value=r2_volume,
+        unit="mol/m3.s",
+        symbol="r2",
+    )
+
+
+rate_expression_2 = ReactionRateExpression(
+    name="reaction 2",
+    basis="pressure",
+    components=components,
+    reaction=reaction_2,
+    params=rate_params,
+    args=rate_args,
+    ret=ret_2,
+    state=states,
+    state_key="Formula-State",
+    eq=r2,
+    component_key="Name-Formula",
+)
+
+
+# ====================================================
+# SECTION: Reaction 3
+# CO2 + H2 <=> CO + H2O
+# Eq. (6) in the paper
+# ====================================================
+
+reaction_3 = Reaction(
+    name="reaction 3",
+    reaction="CO2(g) + H2(g) <=> CO(g) + H2O(g)",
+    components=components,
+)
+
+ret_3: rRet = CustomProperty(value=0.0, unit="mol/m3.s", symbol="r3")
+
+
+def r3(Xs: Dict[str, X], args: rArgs, params: rParams) -> CustomProperty:
+    eps = rate_eps
+
+    P_CO = Xs["CO-g"].value
+    P_CO2 = Xs["CO2-g"].value
+    P_H2 = float(smooth_floor(Xs["H2-g"].value, xmin=eps, s=0.1 * eps))
+    P_H2O = Xs["H2O-g"].value
+
+    T = args["T"].value
+    rho_B = args["rho_B"].value
+    a = args["a"].value
+    R = params["R"].value
+
+    k3 = 1.09e5 * math.exp(-87500.00 / (R * T))
+    KCO = 2.16e-5 * math.exp(47120.51 / (R * T))
+    KCO2 = 7.92e-7 * math.exp(62148.78 / (R * T))
+    KH2O_over_sqrt_KH2 = 4.39e-9 * math.exp(84350.46 / (R * T))
+    KP3 = 10.0 ** (-2073.0 / T + 2.029)
+
+    denominator = (
+        (1.0 + KCO * P_CO + KCO2 * P_CO2)
+        * (math.sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+    )
+    denominator = float(smooth_floor(denominator, xmin=eps, s=0.1 * eps))
+    KP3_safe = float(smooth_floor(KP3, xmin=eps, s=0.1 * eps))
+
+    # r3 = k3*KCO2*(P_CO2*P_H2 - (P_H2O*P_CO)/KP3)/den
+    r3_mass = k3 * KCO2 * (
+        P_CO2 * P_H2 - (P_H2O * P_CO) / KP3_safe
+    ) / denominator
+
+    r3_volume = a * rho_B * r3_mass
+
+    return CustomProperty(
+        name="r3",
+        description="RWGS rate (Graaf form, partial pressure in bar)",
+        value=r3_volume,
+        unit="mol/m3.s",
+        symbol="r3",
+    )
+
+
+rate_expression_3 = ReactionRateExpression(
+    name="reaction 3",
+    basis="pressure",
+    components=components,
+    reaction=reaction_3,
+    params=rate_params,
+    args=rate_args,
+    ret=ret_3,
+    state=states,
+    state_key="Formula-State",
+    eq=r3,
+    component_key="Name-Formula",
+)
+
+
+reaction_rates = [rate_expression_1, rate_expression_2, rate_expression_3]

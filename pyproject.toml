@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyreactsim-core"
+version = "0.1.0"
+description = "pyreactsim-core is a Python package for representing reaction rates. It provides a flexible and extensible framework for defining and working with reaction rates in chemical engineering applications."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Sina Gilassi", email = "sina.gilassi@gmail.com"}
+]
+keywords = [
+    "chemical-engineering",
+    "chemical-reactions",
+    "reaction-rates",
+    "kinetics",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: Unix",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "pydantic>=2.13.1",
+    "pydantic-settings>=2.13.1",
+    "pycuc>=2.7.0",
+    "pyreactlab-core>=0.1.6",
+    "pythermodb-settings>=0.2.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/sinagilassi/PyReactSim-Core"
+Source = "https://github.com/sinagilassi/PyReactSim-Core"
+Tracker = "https://github.com/sinagilassi/PyReactSim-Core/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyreactsim_core*"]
+exclude = [
+    "tests",
+    "tests.*",
+    "examples",
+    "examples.*",
+    "notebooks",
+    "notebooks.*",
+    "statics",
+    "statics.*",
+    "private",
+    "private.*",
+    "app",
+    "app.*"
+]
+
+[tool.setuptools.package-data]
+pyreactsim_core = [
+    "config/*.yml",
+    "data/*.csv",
+    "templates/*.html",
+    "static/*",
+    "static/**/*"
+]
