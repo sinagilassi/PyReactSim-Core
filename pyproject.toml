@@ -28,11 +28,10 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "pydantic>=2.13.1",
-    "pydantic-settings>=2.13.1",
-    "pycuc>=2.7.0",
-    "pyreactlab-core>=0.1.6",
-    "pythermodb-settings>=0.2.10",
+    "pydantic",
+    "pycuc",
+    "pyreactlab-core",
+    "pythermodb-settings",
 ]
 
 [project.urls]
