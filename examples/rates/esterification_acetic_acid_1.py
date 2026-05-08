@@ -13,7 +13,7 @@ from examples.source.liquid_load_model_source import CH3COOH, CH3OH, C3H6O2, H2O
 # ====================================================
 # SECTION: Reaction Rate Expression
 # ====================================================
-
+# components
 components = [CH3COOH, CH3OH, C3H6O2, H2O]
 
 reaction = Reaction(
