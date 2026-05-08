@@ -1,0 +1,20 @@
+REACTION-RATES:
+  REACTION-1:
+    NAME: reaction 1
+    BASIS: concentration
+    REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
+    EXPRESSION:
+      # rate of reaction in mol/m3.s
+      - kf = params['reaction-rate-coefficient | kf | m3/mol.s | 1.0e-6']
+      - kr = params['reaction-rate-coefficient | kr | m3/mol.s | 2.0e-7']
+      # density in kg/m3
+      - rho_B = args["density | rho_B | kg/m3"]
+      # concentration in mol/m3
+      - c_acid = C["CH3COOH-l"]
+      - c_meoh = C["CH3OH-l"]
+      - c_meac = C["C3H6O2-l"]
+      - c_h2o = C["H2O-l"]
+      # reaction rate in mol/m3.s
+      - rf = c_acid * c_meoh
+      - rr = c_meac * c_h2o
+      - r = kf * rf - kr * rr
