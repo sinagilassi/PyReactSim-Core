@@ -29,6 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic",
+    "pyyaml",
     "pycuc",
     "pyreactlab-core",
     "pythermodb-settings",
