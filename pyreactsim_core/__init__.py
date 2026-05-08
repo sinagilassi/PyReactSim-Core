@@ -7,6 +7,7 @@ from .configs.info import (
     __email__,
     __license__,
 )
+from .docs.rate_adapter import RateAdapter, RateExpressionError
 
 __all__ = [
     # config
@@ -16,4 +17,6 @@ __all__ = [
     "__description__",
     "__email__",
     "__license__",
+    "RateAdapter",
+    "RateExpressionError",
 ]
