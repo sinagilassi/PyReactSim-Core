@@ -367,7 +367,7 @@ requires-dist = [
     { name = "pydantic" },
     { name = "pyreactlab-core" },
     { name = "pythermodb-settings" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "pyyaml" },
 ]
 
 [[package]]
