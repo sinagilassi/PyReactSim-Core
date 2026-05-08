@@ -18,7 +18,7 @@ from pyreactsim_core.models import (
 logger = logging.getLogger(__name__)
 
 
-class ReactionRateAdapter:
+class RateAdapter:
     """
     Adapter for reaction rate expressions. This class provides a standardized interface for defining and evaluating reaction rates based on user-defined expressions and parameters within the PyReactSim framework.
 
