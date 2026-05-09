@@ -2,15 +2,16 @@ REFERENCES:
   REACTION-1:
     NAME: reaction 1
     BASIS: concentration
+    UNIT: mol/m3
     REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
     PARAMETERS:
-      kf:
+      k_f:
         name: reaction-rate-coefficient
         description: forward reaction rate coefficient
         value: 1.0e-6
         unit: m3/mol.s
         symbol: k_f
-      kr:
+      k_r:
         name: reaction-rate-coefficient
         description: reverse reaction rate coefficient
         value: 2.0e-7
@@ -32,19 +33,6 @@ REFERENCES:
       unit: mol/m3.s
       symbol: r1
       expression: r
-    STATE:
-      CH3COOH-l:
-        order: 1
-        unit: mol/m3
-      CH3OH-l:
-        order: 1
-        unit: mol/m3
-      C3H6O2-l:
-        order: 1
-        unit: mol/m3
-      H2O-l:
-        order: 1
-        unit: mol/m3
     EXPRESSION:
       - c_acid = C["CH3COOH-l"]
       - c_meoh = C["CH3OH-l"]

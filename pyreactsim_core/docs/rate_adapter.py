@@ -150,7 +150,7 @@ class RateAdapter:
         return_var = self._return_variable(reference.get("RETURN"))
         inferred_orders = self._infer_orders(assignment_nodes, return_var)
         state = self._create_state(reference.get(
-            "STATE"), state_refs, basis, inferred_orders)
+            "STATE"), state_refs, basis, inferred_orders, reference.get("UNIT"))
         ret = self._create_return(reference.get("RETURN"), index)
         eq = self._compile_eq(assignment_nodes, ret, return_var, basis)
 
@@ -353,7 +353,7 @@ class RateAdapter:
         if inferer.complex:
             logger.warning(
                 "Some reaction orders could not be inferred confidently; "
-                "referenced states without explicit orders default to 1."
+                "referenced states without explicit orders default to 0."
             )
         return orders
 
@@ -363,12 +363,19 @@ class RateAdapter:
         state_refs: Dict[str, set[str]],
         basis: Literal["concentration", "pressure"],
         inferred_orders: Dict[str, float],
+        raw_unit: Any,
     ) -> rXs:
         # NOTE: Build state entries from explicit YAML plus expression references.
         explicit_state = value if isinstance(value, dict) else {}
         state_ids = set(state_refs["C"]) | set(
             state_refs["P"]) | set(map(str, explicit_state))
-        unit_default = "mol/m3" if basis == "concentration" else "bar"
+        basis_unit_default = "mol/m3" if basis == "concentration" else "bar"
+        if raw_unit is None:
+            unit_default = basis_unit_default
+        elif isinstance(raw_unit, str):
+            unit_default = raw_unit
+        else:
+            raise RateExpressionError("UNIT must be a string when provided.")
 
         states: rXs = {}
         for state_id in sorted(state_ids):
@@ -386,7 +393,7 @@ class RateAdapter:
                 raise RateExpressionError(
                     f"STATE metadata for '{state_id}' must be a mapping.")
 
-            order = meta.get("order", inferred_orders.get(state_id, 1))
+            order = meta.get("order", inferred_orders.get(state_id, 0))
             unit = meta.get("unit", meta.get("units", unit_default))
             states[state_id] = X(
                 component=component,
