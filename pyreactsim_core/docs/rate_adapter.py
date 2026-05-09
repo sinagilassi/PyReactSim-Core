@@ -45,7 +45,7 @@ class RateAdapter:
     Convert YAML reaction-rate definitions into ReactionRateExpression objects.
 
     The adapter accepts YAML text or files with a REFERENCES mapping and compiles each
-    EXPRESSION into a restricted callable with signature ``eq(Xs, args, params)``.
+    EQUATION into a restricted callable with signature ``eq(Xs, args, params)``.
     """
 
     def __init__(
@@ -132,10 +132,10 @@ class RateAdapter:
         reference = {str(key).upper(): value for key,
                      value in raw_reference.items()}
         expression_lines = self._normalize_expression_lines(
-            reference.get("EXPRESSION"))
+            self._equation_metadata(reference))
         if not expression_lines:
             raise RateExpressionError(
-                "EXPRESSION must contain at least one assignment.")
+                "EQUATION must contain at least one assignment.")
 
         assignment_nodes = self._parse_assignment_nodes(expression_lines)
         state_refs = self._state_references(expression_lines)
@@ -143,15 +143,16 @@ class RateAdapter:
 
         # NOTE: Convert YAML metadata sections into PyReactSim model dictionaries.
         params = self._custom_property_mapping(
-            reference.get("PARAMETERS"), default_unit="")
+            self._params_metadata(reference), default_unit="")
         args = self._custom_property_mapping(
             reference.get("ARGS"), default_unit="")
 
-        return_var = self._return_variable(reference.get("RETURN"))
+        rate_meta = self._rate_metadata(reference, index)
+        return_var = self._return_variable(rate_meta, index)
         inferred_orders = self._infer_orders(assignment_nodes, return_var)
         state = self._create_state(reference.get(
             "STATE"), state_refs, basis, inferred_orders, reference.get("UNIT"))
-        ret = self._create_return(reference.get("RETURN"), index)
+        ret = self._create_return(rate_meta, index)
         eq = self._compile_eq(assignment_nodes, ret, return_var, basis)
 
         name = str(reference.get("NAME") or f"reaction {index}")
@@ -182,6 +183,16 @@ class RateAdapter:
 
     # SECTION: Expression parsing helpers
     @staticmethod
+    def _equation_metadata(reference: Dict[str, Any]) -> Any:
+        # NOTE: EQUATION is canonical; EXPRESSION is accepted as legacy fallback.
+        equation = reference.get("EQUATION")
+        legacy_expression = reference.get("EXPRESSION")
+        if equation is None:
+            return legacy_expression
+        return equation
+
+    # SECTION: Expression parsing helpers
+    @staticmethod
     def _normalize_expression_lines(value: Any) -> List[str]:
         # NOTE: Expressions may be a YAML block string or list of assignment lines.
         if value is None:
@@ -193,12 +204,12 @@ class RateAdapter:
             for item in value:
                 if not isinstance(item, str):
                     raise RateExpressionError(
-                        "EXPRESSION items must be strings.")
+                        "EQUATION items must be strings.")
                 if item.strip():
                     lines.append(item.strip())
             return lines
         raise RateExpressionError(
-            "EXPRESSION must be a string or list of strings.")
+            "EQUATION must be a string or list of strings.")
 
     @staticmethod
     def _parse_assignment_nodes(lines: List[str]) -> List[ast.Assign]:
@@ -209,7 +220,7 @@ class RateAdapter:
             module = ast.parse(line, mode="exec")
             if len(module.body) != 1 or not isinstance(module.body[0], ast.Assign):
                 raise RateExpressionError(
-                    "Each EXPRESSION line must be an assignment.")
+                    "Each EQUATION line must be an assignment.")
             node = module.body[0]
             validator.visit(node)
             nodes.append(node)
@@ -258,7 +269,7 @@ class RateAdapter:
 
     @staticmethod
     def _custom_property_mapping(value: Any, *, default_unit: str) -> Dict[str, CustomProperty]:
-        # NOTE: Convert PARAMETERS and ARGS sections into CustomProperty mappings.
+        # NOTE: Convert PARAMS/PARAMETERS and ARGS sections into CustomProperty mappings.
         out: Dict[str, CustomProperty] = {}
         for key, meta in RateAdapter._iter_named_metadata(value):
             out[key] = RateAdapter._custom_property_from_meta(
@@ -325,16 +336,47 @@ class RateAdapter:
 
     # SECTION: Return and state model creation
     @staticmethod
-    def _return_variable(value: Any) -> str:
-        # NOTE: RETURN.expression selects the final variable; "r" is default.
-        if isinstance(value, dict) and value.get("expression"):
-            return str(value["expression"])
-        return "r"
+    def _params_metadata(reference: Dict[str, Any]) -> Any:
+        # NOTE: PARAMS is canonical; PARAMETERS is accepted as legacy fallback.
+        params = reference.get("PARAMS")
+        legacy_parameters = reference.get("PARAMETERS")
+        if params is not None and not isinstance(params, (dict, list)):
+            raise RateExpressionError("PARAMS must be a mapping or list of mappings.")
+        if legacy_parameters is not None and not isinstance(legacy_parameters, (dict, list)):
+            raise RateExpressionError("PARAMETERS must be a mapping or list of mappings when provided.")
+        if params is not None:
+            return params
+        return legacy_parameters
 
     @staticmethod
-    def _create_return(value: Any, index: int) -> rRet:
-        # NOTE: Return metadata becomes the CustomProperty template for eq output.
-        meta = value if isinstance(value, dict) else {}
+    def _rate_metadata(reference: Dict[str, Any], index: int) -> Dict[str, Any]:
+        # NOTE: RATE is canonical; RETURN is accepted as legacy fallback.
+        rate = reference.get("RATE")
+        legacy_return = reference.get("RETURN")
+        if rate is None and legacy_return is None:
+            return {"symbol": f"r{index}"}
+        if rate is not None and not isinstance(rate, dict):
+            raise RateExpressionError("RATE must be a mapping.")
+        if legacy_return is not None and not isinstance(legacy_return, dict):
+            raise RateExpressionError("RETURN must be a mapping when provided.")
+        if rate is not None:
+            return rate
+        return cast(Dict[str, Any], legacy_return)
+
+    @staticmethod
+    def _return_variable(value: Dict[str, Any], index: int) -> str:
+        # NOTE: Selected return variable comes from RATE.symbol (or RATE.name).
+        symbol = value.get("symbol")
+        if symbol:
+            return str(symbol)
+        name = value.get("name")
+        if name:
+            return str(name)
+        return f"r{index}"
+
+    @staticmethod
+    def _create_return(meta: Dict[str, Any], index: int) -> rRet:
+        # NOTE: RATE metadata becomes the CustomProperty template for eq output.
         key = str(meta.get("symbol") or meta.get("name") or f"r{index}")
         return RateAdapter._custom_property_from_meta(
             key,
@@ -439,10 +481,10 @@ class RateAdapter:
             for target, code in zip(targets, code_objects):
                 namespace[target] = eval(code, {"__builtins__": {}}, namespace)
 
-            # NOTE: The selected return variable must be assigned by EXPRESSION.
+            # NOTE: The selected return variable must be assigned by EQUATION.
             if return_var not in namespace:
                 raise RateExpressionError(
-                    f"Return expression '{return_var}' was not produced by EXPRESSION."
+                    f"Return expression '{return_var}' was not produced by EQUATION."
                 )
 
             return CustomProperty(

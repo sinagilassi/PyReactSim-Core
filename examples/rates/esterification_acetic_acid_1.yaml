@@ -4,7 +4,7 @@ REFERENCES:
     BASIS: concentration
     UNIT: mol/m3
     REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
-    PARAMETERS:
+    PARAMS:
       k_f:
         name: reaction-rate-coefficient
         description: forward reaction rate coefficient
@@ -26,18 +26,16 @@ REFERENCES:
         value: 0.0
         unit: kg/m3
         symbol: rho_B
-    RETURN:
+    RATE:
       name: r1
       description: Artificial mild reversible rate for debugging liquid PBR behavior
-      value: 0.0
       unit: mol/m3.s
       symbol: r1
-      expression: r
-    EXPRESSION:
+    EQUATION:
       - c_acid = C["CH3COOH-l"]
       - c_meoh = C["CH3OH-l"]
       - c_meac = C["C3H6O2-l"]
       - c_h2o = C["H2O-l"]
       - rf = c_acid * c_meoh
       - rr = c_meac * c_h2o
-      - r = rho_B * (kf * rf - kr * rr)
+      - r1 = rho_B * (kf * rf - kr * rr)
