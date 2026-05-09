@@ -38,4 +38,4 @@ REFERENCES:
       - c_h2o = C["H2O-l"]
       - rf = c_acid * c_meoh
       - rr = c_meac * c_h2o
-      - r1 = rho_B * (kf * rf - kr * rr)
+      - r1 = rho_B * (k_f * rf - k_r * rr)
