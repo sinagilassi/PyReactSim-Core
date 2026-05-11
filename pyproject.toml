@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyreactsim-core"
-version = "0.1.1"
+version = "0.2.0"
 description = "pyreactsim-core is a Python package for representing reaction rates. It provides a flexible and extensible framework for defining and working with reaction rates in chemical engineering applications."
 readme = "README.md"
 requires-python = ">=3.11"
