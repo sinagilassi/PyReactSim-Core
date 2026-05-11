@@ -18,6 +18,10 @@ class ReactionRateExpression(BaseModel):
         ...,
         description="The name of the reaction rate expression. This should be unique and descriptive of the reaction it represents."
     )
+    description: Optional[str] = Field(
+        default=None,
+        description="Optional human-readable description of the reaction-rate reference."
+    )
     basis: Literal['concentration', 'pressure'] = Field(
         ...,
         description="The basis for the reaction rate expression, either 'concentration' or 'pressure'."
