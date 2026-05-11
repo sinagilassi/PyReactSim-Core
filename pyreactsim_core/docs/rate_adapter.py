@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import logging
 import math
+import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Literal, cast
 
@@ -19,6 +20,7 @@ from pyreactsim_core.docs.rate_adapter_validation import (
     SAFE_FUNCTIONS,
     STATE_REF_RE,
     StateValues,
+    validate_component_ids,
 )
 from pyreactsim_core.models import ReactionRateExpression, X, rArgs, rParams, rRet, rXs
 
@@ -37,6 +39,10 @@ _META_KEYS = {
     "expression",
     "order",
 }
+_REACTION_SPECIES_RE = re.compile(r"([A-Za-z0-9()+\-]+)\(([^()]+)\)")
+_LEADING_STOICH_RE = re.compile(
+    r"^\s*\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s*"
+)
 
 
 # SECTION: Rate Adapter
@@ -171,12 +177,26 @@ class RateAdapter:
         reaction_text = reference.get("REACTION")
         if not reaction_text:
             raise RateExpressionError(f"{name} is missing REACTION.")
+        reaction_text = str(reaction_text)
+        # NOTE: COMPONENTS is the preferred explicit way to define component scope.
+        # If not provided, fallback to reaction/equation inference for backward compatibility.
+        components_from_ref = self._components_from_reference(
+            reference.get("COMPONENTS"),
+            reaction_name=name,
+        )
+        if components_from_ref:
+            reaction_components = components_from_ref
+        else:
+            reaction_components = self._reaction_components(
+                reaction_text=reaction_text,
+                reaction_name=name
+            )
 
         # NOTE: Reaction keeps the original reaction string and supplied components.
         reaction = Reaction(
             name=name,
-            reaction=str(reaction_text),
-            components=self.components,
+            reaction=reaction_text,
+            components=reaction_components,
         )
 
         return ReactionRateExpression(
@@ -193,6 +213,110 @@ class RateAdapter:
             state_key=cast(ComponentKey, self.state_key),
             eq=eq,
         )
+
+    def _components_from_reference(
+        self,
+        raw_components: Any,
+        *,
+        reaction_name: str,
+    ) -> List[Component]:
+        component_ids = validate_component_ids(raw_components)
+        if not component_ids:
+            return []
+
+        components: List[Component] = []
+        missing: List[str] = []
+        for cid in component_ids:
+            component = self._component_by_state_id.get(cid)
+            if component is None:
+                missing.append(cid)
+            else:
+                components.append(component)
+
+        if missing:
+            raise RateExpressionError(
+                f"{reaction_name} has COMPONENTS entries not found in provided components "
+                f"using state_key '{self.state_key}': {missing}"
+            )
+        return components
+
+    def _reaction_components(
+        self,
+        *,
+        reaction_text: str,
+        reaction_name: str,
+    ) -> List[Component]:
+        participant_ids = self._reaction_participant_ids(reaction_text)
+        components: List[Component] = []
+        missing: List[str] = []
+        for pid in participant_ids:
+            component = self._component_by_state_id.get(pid)
+            if component is None:
+                missing.append(pid)
+            else:
+                components.append(component)
+
+        if missing:
+            raise RateExpressionError(
+                f"{reaction_name} has participants not found in provided components "
+                f"using state_key '{self.state_key}': {missing}"
+            )
+        return components
+
+    @staticmethod
+    def _reaction_participant_ids(reaction_text: str) -> List[str]:
+        species = _REACTION_SPECIES_RE.findall(reaction_text)
+        if not species:
+            raise RateExpressionError(
+                f"Could not parse reaction participants from REACTION: '{reaction_text}'."
+            )
+
+        participant_ids: List[str] = []
+        seen: set[str] = set()
+        for formula, state in species:
+            # NOTE: allow stoichiometric prefixes in reaction strings, e.g. 2H2(g), 0.5O2(g)
+            normalized_formula = _LEADING_STOICH_RE.sub("", formula.strip())
+            if not normalized_formula:
+                raise RateExpressionError(
+                    f"Invalid participant token '{formula}({state})' in REACTION: '{reaction_text}'."
+                )
+
+            pid = f"{normalized_formula}-{state.strip()}"
+            if pid not in seen:
+                seen.add(pid)
+                participant_ids.append(pid)
+        return participant_ids
+
+    def _expression_components(
+        self,
+        *,
+        reaction_components: List[Component],
+        state_refs: Dict[str, set[str]],
+        reaction_name: str,
+    ) -> List[Component]:
+        # NOTE: Reaction stoichiometry participants can be a subset of kinetic state refs
+        # (e.g., inhibition terms). Include all referenced states so model validation passes.
+        ref_ids = sorted(state_refs["C"] | state_refs["P"])
+        if not ref_ids:
+            return reaction_components
+
+        by_id = {
+            set_component_id(component, self.state_key): component
+            for component in reaction_components
+        }
+
+        for sid in ref_ids:
+            if sid in by_id:
+                continue
+            comp = self._component_by_state_id.get(sid)
+            if comp is None:
+                raise RateExpressionError(
+                    f"{reaction_name} references state '{sid}' in EQUATION but no matching "
+                    f"component was provided for state_key '{self.state_key}'."
+                )
+            by_id[sid] = comp
+
+        return [by_id[sid] for sid in sorted(by_id)]
 
     # SECTION: Expression parsing helpers
     @staticmethod
@@ -427,10 +551,14 @@ class RateAdapter:
         inferred_orders: Dict[str, float],
         raw_unit: Any,
     ) -> rXs:
-        # NOTE: Build state entries from explicit YAML plus expression references.
+        # NOTE: Build state entries for all provided components plus explicit refs.
         explicit_state = value if isinstance(value, dict) else {}
-        state_ids = set(state_refs["C"]) | set(
-            state_refs["P"]) | set(map(str, explicit_state))
+        state_ids = (
+            set(self._component_by_state_id.keys())
+            | set(state_refs["C"])
+            | set(state_refs["P"])
+            | set(map(str, explicit_state))
+        )
         basis_unit_default = "mol/m3" if basis == "concentration" else "bar"
         if raw_unit is None:
             unit_default = basis_unit_default

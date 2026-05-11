@@ -12,6 +12,7 @@ from pyreactsim_core.models import rXs
 # SECTION: Expression constants
 # NOTE: Regex extracts state references such as C["CO2-g"] and P["H2-g"].
 STATE_REF_RE = re.compile(r"\b([CP])\s*\[\s*(['\"])(.*?)\2\s*\]")
+COMPONENT_ID_RE = re.compile(r"^[A-Za-z0-9()+\-]+-[A-Za-z0-9]+$")
 
 # NOTE: Functions exposed directly inside YAML expression evaluation.
 SAFE_FUNCTIONS: Dict[str, Callable[..., Any]] = {
@@ -34,6 +35,36 @@ SAFE_MATH_NAMES: Dict[str, Any] = {
 # SECTION: Exceptions
 class RateExpressionError(ValueError):
     """Raised when a YAML reaction-rate expression is invalid or unsafe."""
+
+
+def validate_component_ids(value: Any) -> list[str]:
+    """
+    Validate COMPONENTS metadata and normalize it to a list of formula-state ids.
+
+    Expected format:
+    - list of strings, e.g. ["CO2-g", "H2-g", "CH3OH-g"]
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise RateExpressionError("COMPONENTS must be a list of strings.")
+
+    ids: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            raise RateExpressionError("COMPONENTS entries must be strings.")
+        comp_id = item.strip()
+        if not comp_id:
+            raise RateExpressionError("COMPONENTS entries must be non-empty strings.")
+        if not COMPONENT_ID_RE.match(comp_id):
+            raise RateExpressionError(
+                f"Invalid COMPONENTS entry '{comp_id}'. Expected format 'Formula-State'."
+            )
+        if comp_id not in seen:
+            seen.add(comp_id)
+            ids.append(comp_id)
+    return ids
 
 
 # SECTION: Runtime state access
@@ -262,10 +293,12 @@ class OrderInferer(ast.NodeVisitor):
 
 # SECTION: Public exports
 __all__ = [
+    "COMPONENT_ID_RE",
     "OrderInferer",
     "RateExpressionError",
     "RestrictedExpressionValidator",
     "SAFE_FUNCTIONS",
     "STATE_REF_RE",
     "StateValues",
+    "validate_component_ids",
 ]
