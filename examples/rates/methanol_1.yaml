@@ -1,0 +1,155 @@
+REFERENCES:
+  REACTION-1:
+    NAME: reaction 1
+    DESCRIPTION: CO hydrogenation rate (Graaf form, partial pressure in bar)
+    BASIS: pressure
+    UNIT: bar
+    REACTION: CO(g) + 2H2(g) <=> CH3OH(g)
+    PARAMS:
+      R:
+        name: gas constant
+        description: universal gas constant
+        value: 8.314462618
+        unit: J/mol.K
+        symbol: R
+    ARGS:
+      T:
+        description: temperature
+        value: 503.0
+        unit: K
+        symbol: T
+      rho_B:
+        description: catalyst-bed bulk density
+        value: 1770.0
+        unit: kgcat/m3
+        symbol: rho_B
+      a:
+        description: catalyst activity factor
+        value: 1.0
+        unit: None
+        symbol: a
+    RATE:
+      name: reaction rate 1
+      description: CO hydrogenation rate (Graaf form, partial pressure in bar)
+      unit: mol/m3.s
+      symbol: r1
+    EQUATION:
+      - eps = 1.0e-8
+      - P_CO = P["CO-g"]
+      - P_CO2 = P["CO2-g"]
+      - P_H2 = P["H2-g"] + eps
+      - P_CH3OH = P["CH3OH-g"]
+      - P_H2O = P["H2O-g"]
+      - k1 = 4.65e7 * exp(-107752.86 / (R * T))
+      - KCO = 2.16e-5 * exp(47120.51 / (R * T))
+      - KCO2 = 7.92e-7 * exp(62148.78 / (R * T))
+      - KH2O_over_sqrt_KH2 = 4.39e-9 * exp(84350.46 / (R * T))
+      - KP1 = pow(10.0, 5139.0 / T - 12.621)
+      - denominator = (1.0 + KCO * P_CO + KCO2 * P_CO2) * (sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+      - denominator_safe = denominator + eps
+      - KP1_safe = KP1 + eps
+      - r1_mass = k1 * KCO * (P_CO * pow(P_H2, 1.5) - P_CH3OH / (sqrt(P_H2) * KP1_safe)) / denominator_safe
+      - r1 = a * rho_B * r1_mass
+
+  REACTION-2:
+    NAME: reaction 2
+    DESCRIPTION: CO2 hydrogenation rate (Graaf form, partial pressure in bar)
+    BASIS: pressure
+    UNIT: bar
+    REACTION: CO2(g) + 3H2(g) <=> CH3OH(g) + H2O(g)
+    PARAMS:
+      R:
+        name: gas constant
+        description: universal gas constant
+        value: 8.314462618
+        unit: J/mol.K
+        symbol: R
+    ARGS:
+      T:
+        description: temperature
+        value: 503.0
+        unit: K
+        symbol: T
+      rho_B:
+        description: catalyst-bed bulk density
+        value: 1770.0
+        unit: kgcat/m3
+        symbol: rho_B
+      a:
+        description: catalyst activity factor
+        value: 1.0
+        unit: None
+        symbol: a
+    RATE:
+      name: reaction rate 2
+      description: CO2 hydrogenation rate (Graaf form, partial pressure in bar)
+      unit: mol/m3.s
+      symbol: r2
+    EQUATION:
+      - eps = 1.0e-8
+      - P_CO = P["CO-g"]
+      - P_CO2 = P["CO2-g"]
+      - P_H2 = P["H2-g"] + eps
+      - P_CH3OH = P["CH3OH-g"]
+      - P_H2O = P["H2O-g"]
+      - k2 = 9.64e11 * exp(-152900.0 / (R * T))
+      - KCO = 2.16e-5 * exp(47120.51 / (R * T))
+      - KCO2 = 7.92e-7 * exp(62148.78 / (R * T))
+      - KH2O_over_sqrt_KH2 = 4.39e-9 * exp(84350.46 / (R * T))
+      - KP2 = pow(10.0, 3066.0 / T - 10.592)
+      - denominator = (1.0 + KCO * P_CO + KCO2 * P_CO2) * (sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+      - denominator_safe = denominator + eps
+      - KP2_safe = KP2 + eps
+      - r2_mass = k2 * KCO2 * (P_CO2 * pow(P_H2, 1.5) - (P_H2O * P_CH3OH) / (pow(P_H2, 1.5) * KP2_safe)) / denominator_safe
+      - r2 = a * rho_B * r2_mass
+
+  REACTION-3:
+    NAME: reaction 3
+    DESCRIPTION: RWGS rate (Graaf form, partial pressure in bar)
+    BASIS: pressure
+    UNIT: bar
+    REACTION: CO2(g) + H2(g) <=> CO(g) + H2O(g)
+    PARAMS:
+      R:
+        name: gas constant
+        description: universal gas constant
+        value: 8.314462618
+        unit: J/mol.K
+        symbol: R
+    ARGS:
+      T:
+        description: temperature
+        value: 503.0
+        unit: K
+        symbol: T
+      rho_B:
+        description: catalyst-bed bulk density
+        value: 1770.0
+        unit: kgcat/m3
+        symbol: rho_B
+      a:
+        description: catalyst activity factor
+        value: 1.0
+        unit: None
+        symbol: a
+    RATE:
+      name: reaction rate 3
+      description: RWGS rate (Graaf form, partial pressure in bar)
+      unit: mol/m3.s
+      symbol: r3
+    EQUATION:
+      - eps = 1.0e-8
+      - P_CO = P["CO-g"]
+      - P_CO2 = P["CO2-g"]
+      - P_H2 = P["H2-g"] + eps
+      - P_H2O = P["H2O-g"]
+      - k3 = 1.09e5 * exp(-87500.0 / (R * T))
+      - KCO = 2.16e-5 * exp(47120.51 / (R * T))
+      - KCO2 = 7.92e-7 * exp(62148.78 / (R * T))
+      - KH2O_over_sqrt_KH2 = 4.39e-9 * exp(84350.46 / (R * T))
+      - KP3 = pow(10.0, -2073.0 / T + 2.029)
+      - denominator = (1.0 + KCO * P_CO + KCO2 * P_CO2) * (sqrt(P_H2) + KH2O_over_sqrt_KH2 * P_H2O)
+      - denominator_safe = denominator + eps
+      - KP3_safe = KP3 + eps
+      - r3_mass = k3 * KCO2 * (P_CO2 * P_H2 - (P_H2O * P_CO) / KP3_safe) / denominator_safe
+      - r3 = a * rho_B * r3_mass

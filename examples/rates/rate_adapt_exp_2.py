@@ -1,8 +1,10 @@
-from pythermodb_settings.models import Component, CustomProperty
-from pyreactsim_core.app import load_reaction_rate_expression
 from rich import print
 from pathlib import Path
 import sys
+from pythermodb_settings.models import Component, CustomProperty
+# pyreactsim-core
+from pyreactsim_core import load_reaction_rate_expression
+from pyreactsim_core.models import ReactionRateExpression, ReactionRateSource
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -22,7 +24,7 @@ components = [CH3COOH, CH3OH, C3H6O2, H2O]
 yaml_path = Path(__file__).with_name("esterification_acetic_acid_1.yaml")
 yaml_text = yaml_path.read_text(encoding="utf-8")
 
-rate_loaded = load_reaction_rate_expression(
+rate_loaded: ReactionRateSource | None = load_reaction_rate_expression(
     components=components,
     reaction_rate_expression=yaml_text,
     mode="log",  # log time measurement for loading the rate expression
@@ -37,7 +39,7 @@ if rate_loaded is None:
         "Failed to load reaction rate expression from YAML content.")
 
 # set rate expression for testing
-rate_expression = rate_loaded.reaction_rate_expression
+rate_expression: ReactionRateExpression = rate_loaded.reaction_rate_expression
 
 # SECTION: Calculation Smoke Test
 xi = {
