@@ -129,10 +129,14 @@ class RateAdapter:
         index: int,
     ) -> ReactionRateExpression:
         # NOTE: Normalize top-level YAML keys while preserving nested user keys.
-        reference = {str(key).upper(): value for key,
-                     value in raw_reference.items()}
+        reference = {
+            str(key).upper(): value for key, value in raw_reference.items()
+        }
+
+        # NOTE: parse & validate
         expression_lines = self._normalize_expression_lines(
-            self._equation_metadata(reference))
+            self._equation_metadata(reference)
+        )
         if not expression_lines:
             raise RateExpressionError(
                 "EQUATION must contain at least one assignment.")
@@ -145,7 +149,9 @@ class RateAdapter:
         params = self._custom_property_mapping(
             self._params_metadata(reference), default_unit="")
         args = self._custom_property_mapping(
-            reference.get("ARGS"), default_unit="")
+            reference.get("ARGS"),
+            default_unit="",
+        )
 
         rate_meta = self._rate_metadata(reference, index)
         return_var = self._return_variable(rate_meta, index)
@@ -153,9 +159,15 @@ class RateAdapter:
         state = self._create_state(reference.get(
             "STATE"), state_refs, basis, inferred_orders, reference.get("UNIT"))
         ret = self._create_return(rate_meta, index)
+
+        # ! equation
         eq = self._compile_eq(assignment_nodes, ret, return_var, basis)
 
         name = str(reference.get("NAME") or f"reaction {index}")
+        description = reference.get("DESCRIPTION")
+        if description is not None and not isinstance(description, str):
+            raise RateExpressionError(
+                "DESCRIPTION must be a string when provided.")
         reaction_text = reference.get("REACTION")
         if not reaction_text:
             raise RateExpressionError(f"{name} is missing REACTION.")
@@ -169,6 +181,7 @@ class RateAdapter:
 
         return ReactionRateExpression(
             name=name,
+            description=description,
             basis=basis,
             components=self.components,
             component_key=cast(ComponentKey, self.component_key),
@@ -268,7 +281,11 @@ class RateAdapter:
             "Cannot infer BASIS without C[...] or P[...] references.")
 
     @staticmethod
-    def _custom_property_mapping(value: Any, *, default_unit: str) -> Dict[str, CustomProperty]:
+    def _custom_property_mapping(
+        value: Any,
+        *,
+        default_unit: str,
+    ) -> Dict[str, CustomProperty]:
         # NOTE: Convert PARAMS/PARAMETERS and ARGS sections into CustomProperty mappings.
         out: Dict[str, CustomProperty] = {}
         for key, meta in RateAdapter._iter_named_metadata(value):
@@ -341,9 +358,11 @@ class RateAdapter:
         params = reference.get("PARAMS")
         legacy_parameters = reference.get("PARAMETERS")
         if params is not None and not isinstance(params, (dict, list)):
-            raise RateExpressionError("PARAMS must be a mapping or list of mappings.")
+            raise RateExpressionError(
+                "PARAMS must be a mapping or list of mappings.")
         if legacy_parameters is not None and not isinstance(legacy_parameters, (dict, list)):
-            raise RateExpressionError("PARAMETERS must be a mapping or list of mappings when provided.")
+            raise RateExpressionError(
+                "PARAMETERS must be a mapping or list of mappings when provided.")
         if params is not None:
             return params
         return legacy_parameters
@@ -358,7 +377,8 @@ class RateAdapter:
         if rate is not None and not isinstance(rate, dict):
             raise RateExpressionError("RATE must be a mapping.")
         if legacy_return is not None and not isinstance(legacy_return, dict):
-            raise RateExpressionError("RETURN must be a mapping when provided.")
+            raise RateExpressionError(
+                "RETURN must be a mapping when provided.")
         if rate is not None:
             return rate
         return cast(Dict[str, Any], legacy_return)
@@ -459,7 +479,8 @@ class RateAdapter:
                     "<reaction-rate-expression>", "eval")
             for node in assignment_nodes
         ]
-        targets = [cast(ast.Name, node.targets[0]).id for node in assignment_nodes]
+        targets = [cast(ast.Name, node.targets[0]
+                        ).id for node in assignment_nodes]
         state_symbol = "C" if basis == "concentration" else "P"
 
         def eq(Xs: rXs, args: rArgs, params: rParams) -> rRet:
