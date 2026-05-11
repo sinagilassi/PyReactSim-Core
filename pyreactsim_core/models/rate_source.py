@@ -43,6 +43,10 @@ class ReactionRateSource(BaseModel):
         ...,
         description="The name of the reaction rate expression source, which can be used for identification and reference purposes."
     )
+    components: List[Component] = Field(
+        ...,
+        description="Resolved list of components used by this reaction rate source."
+    )
     basis: Literal["concentration", "pressure"] = Field(
         ...,
         description="The basis of the reaction rate expression, indicating whether the reaction rate is defined based on concentration or pressure of the components involved in the reaction."
