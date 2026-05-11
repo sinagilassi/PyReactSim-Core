@@ -9,6 +9,9 @@ from .configs.info import (
 )
 from .docs.rate_adapter import RateAdapter, RateExpressionError
 
+# NOTE: app
+from .app import load_reaction_rate_expression, load_reaction_rate_expressions
+
 __all__ = [
     # config
     "__version__",
@@ -19,4 +22,7 @@ __all__ = [
     "__license__",
     "RateAdapter",
     "RateExpressionError",
+    # app
+    "load_reaction_rate_expression",
+    "load_reaction_rate_expressions",
 ]

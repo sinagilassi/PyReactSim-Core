@@ -1,12 +1,11 @@
 # import libs
 import logging
-from typing import Dict, List, Literal, Optional, Callable
+from typing import List, Dict, Optional
 from pythermodb_settings.models import Component, CustomProperty, Pressure, Temperature, Volume, CustomProp, ComponentKey
 from pythermodb_settings.utils import measure_time
 # locals
-from .models.rate_exp import ReactionRateExpression
 from .docs.rate_adapter import RateAdapter
-from .models import ReactionRateExpressionSource
+from .models import ReactionRateExpressionSource, ReactionRateSource
 
 # NOTE: logger setup
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ def load_reaction_rate_expression(
         component_key: ComponentKey = "Name-Formula",
         state_key: ComponentKey = "Formula-State",
         **kwargs
-) -> Optional[ReactionRateExpression]:
+) -> Optional[ReactionRateSource]:
     """
     Load a reaction rate expression from a ReactionRateExpression model.
 
@@ -43,8 +42,8 @@ def load_reaction_rate_expression(
 
     Returns
     -------
-    ReactionRateExpression | None
-        The loaded reaction rate expression model, or None if there was an error loading the model.
+    ReactionRateSource | None
+        The loaded reaction rate source model, or None if there was an error loading the model.
     """
     try:
         # NOTE: load reaction rate expression using the RateAdapter
@@ -64,8 +63,15 @@ def load_reaction_rate_expression(
                 "No reaction rate expressions found in YAML content."
             )
 
-        # res
-        return rate_expressions[0]
+        # NOTE: wrap as ReactionRateSource (includes parsed expression + original YAML source)
+        rate_expression = rate_expressions[0]
+        return ReactionRateSource(
+            name=rate_expression.name,
+            basis=rate_expression.basis,
+            description=rate_expression.description,
+            source=reaction_rate_expression,
+            reaction_rate_expression=rate_expression
+        )
     except Exception as e:
         logger.error(f"Error loading reaction rate expression: {e}")
         return None
@@ -77,7 +83,7 @@ def load_reaction_rate_expressions(
         component_key: ComponentKey = "Name-Formula",
         state_key: ComponentKey = "Formula-State",
         **kwargs
-) -> List[ReactionRateExpression]:
+) -> List[ReactionRateSource]:
     """
     Load multiple reaction rate expressions from a list of ReactionRateExpressionSource models.
 
@@ -96,16 +102,16 @@ def load_reaction_rate_expressions(
 
     Returns
     -------
-    List[ReactionRateExpression]
-        A list of loaded ReactionRateExpression models, or an empty list if there were errors loading any of the models.
+    List[ReactionRateSource]
+        A list of loaded ReactionRateSource models, or an empty list if there were errors loading any of the models.
     """
     try:
         # init list to hold loaded reaction rate expressions
-        rate_expressions = []
+        rate_sources = []
 
         # iterate over sources and load each reaction rate expression
         for source in reaction_rate_sources:
-            rate_expression = load_reaction_rate_expression(
+            rate_source = load_reaction_rate_expression(
                 components=source.components,
                 reaction_rate_expression=source.source,
                 component_key=component_key,
@@ -114,11 +120,11 @@ def load_reaction_rate_expressions(
             )
 
             # >> check and append
-            if rate_expression is not None:
-                rate_expressions.append(rate_expression)
+            if rate_source is not None:
+                rate_sources.append(rate_source)
 
         # res
-        return rate_expressions
+        return rate_sources
     except Exception as e:
         logger.error(f"Error loading reaction rate expressions: {e}")
         return []
