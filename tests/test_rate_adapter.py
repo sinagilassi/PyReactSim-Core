@@ -59,6 +59,7 @@ class RateAdapterTest(unittest.TestCase):
         REFERENCES:
           REACTION-1:
             NAME: reaction 1
+            DESCRIPTION: Artificial mild reversible esterification rate for debugging liquid PBR behavior
             BASIS: concentration
             REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
             PARAMETERS:
@@ -72,10 +73,12 @@ class RateAdapterTest(unittest.TestCase):
                 symbol: k_r
             ARGS:
               T:
+                description: temperature
                 value: 0.0
                 unit: K
                 symbol: T
               rho_B:
+                description: catalyst-bed bulk density
                 value: 0.0
                 unit: kg/m3
                 symbol: rho_B
@@ -115,6 +118,10 @@ class RateAdapterTest(unittest.TestCase):
         ).to_rate_expressions()[0]
 
         self.assertEqual(rate.name, "reaction 1")
+        self.assertEqual(
+            rate.description,
+            "Artificial mild reversible esterification rate for debugging liquid PBR behavior",
+        )
         self.assertEqual(rate.basis, "concentration")
         self.assertEqual(set(rate.params), {"kf", "kr"})
         self.assertEqual(set(rate.args), {"T", "rho_B"})
@@ -135,6 +142,28 @@ class RateAdapterTest(unittest.TestCase):
         expected = 900.0 * (1.0e-6 * 1000.0 * 800.0 - 2.0e-7 * 100.0 * 50.0)
         self.assertAlmostEqual(result.value, expected)
         self.assertEqual(result.unit, "mol/m3.s")
+
+    def test_args_description_is_optional(self):
+        yaml_text = """
+        REFERENCES:
+          REACTION-1:
+            NAME: reaction 1
+            BASIS: concentration
+            REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
+            ARGS:
+              T:
+                value: 298.15
+                unit: K
+                symbol: T
+            EXPRESSION:
+              - r = C["CH3COOH-l"] * C["CH3OH-l"]
+        """
+
+        rate = RateAdapter.from_yaml_string(
+            textwrap.dedent(yaml_text),
+            self.components_l,
+        ).to_rate_expressions()[0]
+        self.assertIn("T", rate.args)
 
     def test_basis_inference_for_concentration_and_pressure(self):
         concentration_yaml = """
