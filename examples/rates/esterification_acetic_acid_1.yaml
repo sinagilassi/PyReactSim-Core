@@ -4,6 +4,11 @@ REFERENCES:
     DESCRIPTION: Artificial mild reversible esterification rate for debugging liquid PBR behavior
     BASIS: concentration
     UNIT: mol/m3
+    COMPONENTS:
+      - CH3COOH-l
+      - CH3OH-l
+      - C3H6O2-l
+      - H2O-l
     REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
     PARAMS:
       k_f:

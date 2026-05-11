@@ -24,7 +24,7 @@ components = [CH3COOH, CH3OH, C3H6O2, H2O]
 yaml_path = Path(__file__).with_name("esterification_acetic_acid_1.yaml")
 yaml_text = yaml_path.read_text(encoding="utf-8")
 
-rate_loaded: ReactionRateSource | None = load_reaction_rate_expression(
+rate_loaded: list[ReactionRateSource] | None = load_reaction_rate_expression(
     components=components,
     reaction_rate_expression=yaml_text,
     mode="log",  # log time measurement for loading the rate expression
@@ -34,12 +34,12 @@ print("rate loaded:")
 print(rate_loaded)
 
 # >> check
-if rate_loaded is None:
+if not rate_loaded:
     raise ValueError(
         "Failed to load reaction rate expression from YAML content.")
 
 # set rate expression for testing
-rate_expression: ReactionRateExpression = rate_loaded.reaction_rate_expression
+rate_expression: ReactionRateExpression = rate_loaded[0].reaction_rate_expression
 
 # SECTION: Calculation Smoke Test
 xi = {
