@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 
 from rich import print
+from pythermodb_settings.models import CustomProperty
 
 from pyreactsim_core import load_reaction_rate_expression
 from pyreactsim_core.models import ReactionRateSource
@@ -38,8 +39,26 @@ print("\nLoaded reaction summary:")
 for idx, rate_source in enumerate(rate_loaded, start=1):
     exp = rate_source.reaction_rate_expression
     participant_ids = [
-        f"{c.formula}-{c.state}" for c in exp.reaction.available_components]
+        f"{c.formula}-{c.state}" for c in rate_source.components]
     print(
         f"[{idx}] name={rate_source.name}, basis={rate_source.basis}, "
         f"participants={participant_ids}"
+    )
+
+print("\nDummy-rate calculation:")
+# Explicit partial-pressure state for all gas components
+xi = {
+    "CO-g": CustomProperty(value=5.0, unit="bar", symbol="P_CO"),
+    "CO2-g": CustomProperty(value=3.0, unit="bar", symbol="P_CO2"),
+    "H2-g": CustomProperty(value=20.0, unit="bar", symbol="P_H2"),
+    "CH3OH-g": CustomProperty(value=1.0, unit="bar", symbol="P_CH3OH"),
+    "H2O-g": CustomProperty(value=0.5, unit="bar", symbol="P_H2O"),
+}
+
+for idx, rate_source in enumerate(rate_loaded, start=1):
+    exp = rate_source.reaction_rate_expression
+    rate_result = exp.calc(xi)
+    print(
+        f"[{idx}] {exp.name}: value={rate_result.value:.6e} "
+        f"{rate_result.unit} (symbol={rate_result.symbol})"
     )
