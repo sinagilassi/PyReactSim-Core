@@ -193,4 +193,6 @@ rate_expression_2 = ReactionRateExpression(
 )
 
 reaction_rates: List[ReactionRateExpression] = [
-    rate_expression_1, rate_expression_2]
+    rate_expression_1,
+    rate_expression_2
+]

@@ -1,6 +1,7 @@
 REFERENCES:
   REACTION-1:
     NAME: reaction 1
+    DESCRIPTION: Artificial mild reversible esterification rate for debugging liquid PBR behavior
     BASIS: concentration
     UNIT: mol/m3
     REACTION: CH3COOH(l) + CH3OH(l) <=> C3H6O2(l) + H2O(l)
@@ -19,15 +20,17 @@ REFERENCES:
         symbol: k_r
     ARGS:
       T:
+        description: temperature
         value: 0.0
         unit: K
         symbol: T
       rho_B:
+        description: catalyst-bed bulk density
         value: 0.0
         unit: kg/m3
         symbol: rho_B
     RATE:
-      name: r1
+      name: reaction rate
       description: Artificial mild reversible rate for debugging liquid PBR behavior
       unit: mol/m3.s
       symbol: r1
