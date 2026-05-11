@@ -1,6 +1,6 @@
 # import libs
 import logging
-from typing import List, Optional
+from typing import List, Optional, cast
 from pythermodb_settings.models import Component, ComponentKey
 from pythermodb_settings.utils import measure_time
 # locals
@@ -65,17 +65,24 @@ def load_reaction_rate_expression(
             )
 
         # NOTE: wrap all parsed reactions as ReactionRateSource entries
-        return [
-            ReactionRateSource(
-                name=rate_expression.name,
-                components=rate_expression.reaction.components,
-                basis=rate_expression.basis,
-                description=rate_expression.description,
-                source=reaction_rate_expression,
-                reaction_rate_expression=rate_expression
+        rate_sources: List[ReactionRateSource] = []
+        for rate_expression in rate_expressions:
+            reaction_components = cast(
+                List[Component],
+                rate_expression.reaction.components or []
             )
-            for rate_expression in rate_expressions
-        ]
+            rate_sources.append(
+                ReactionRateSource(
+                    name=rate_expression.name,
+                    components=reaction_components,
+                    basis=rate_expression.basis,
+                    description=rate_expression.description,
+                    source=reaction_rate_expression,
+                    reaction_rate_expression=rate_expression
+                )
+            )
+
+        return rate_sources
     except Exception as e:
         logger.error(f"Error loading reaction rate expression: {e}")
         return None
